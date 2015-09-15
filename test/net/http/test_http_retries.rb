@@ -39,6 +39,7 @@ class TestNetHTTPIdempotentRetries < Test::Unit::TestCase
             @handlers.shift.call(method, uri, headers(socket), socket)
             socket.close unless socket.closed?
           rescue
+            socket.close unless socket.closed?
             @server.close
             @server = TCPServer.new(@address, @port)
             retry
@@ -106,7 +107,7 @@ class TestNetHTTPIdempotentRetries < Test::Unit::TestCase
     req.retry_networking_errors = false
 
     http = Net::HTTP.new(@server.address, @server.port)
-    assert_raises {
+    assert_raises(EOFError) {
       http.request(req)
     }
   end
@@ -161,14 +162,13 @@ class TestNetHTTPIdempotentRetries < Test::Unit::TestCase
     yield_count = 0
     byte_count = 0
 
-    assert_raises {
-      http.request(Net::HTTP::Get.new('/')) do |resp|
-        yield_count += 1
-        resp.read_body do |bytes|
-          byte_count += bytes.bytesize
-        end
+    http.request(Net::HTTP::Get.new('/')) do |resp|
+      yield_count += 1
+      resp.read_body do |bytes|
+        byte_count += bytes.bytesize
       end
-    }
+    end
+
     assert_equal(one_meg / 2, byte_count)
     assert_equal(1, yield_count)
   end
